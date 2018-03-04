@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:util="http://www.springframework.org/schema/util"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+
+
+	<!-- Properties configuration for spring -->
+	<context:component-scan base-package="com.macys.cd.camel.service" />
+	
+	<import resource="serviceRoutes.xml" />
+	<camelContext xmlns="http://camel.apache.org/schema/spring">
+	
+
+		<propertyPlaceholder id="properties"
+			location="classpath:camel.properties" />
+		<routeContextRef ref="serviceRoutes" />
+		<restConfiguration bindingMode="auto" component="servlet"
+			port="{{camel.rest.port}}" />
+		<!-- <dataFormats> <json id="gson" library="Gson" /> </dataFormats> -->
+		<!-- <dataFormats>
+			<json id="gson" prettyPrint="true" library="Gson" />
+		</dataFormats> -->
+		
+		<!-- Rest Routes -->
+		
+		<rest>
+
+			<!-- Providing simple camle rest api -->
+			<post id="Start Deployment Web service" uri="/startDeployment"
+				consumes="application/json" produces="application/json">
+				<route>
+					<setBody>
+						<constant>{"status":"{{camel.inprogressStatus}}"}</constant>
+					</setBody>
+				</route>
+			</post>
+
+			<!-- Calling Java class by defining bean -->
+			<post id="Start Sample Web service" uri="/executeService"
+				consumes="application/json" produces="application/json">
+				<route>
+					<to uri="bean:sampleService?method=execute()" />
+					<setBody>
+						<constant>{"status":"{{camel.completed}}"}</constant>
+					</setBody>
+				</route>
+			</post>
+
+			<!--We can define routes (serviceRoutes.xml) according the service and 
+				call by using to and uri, we can use either seda or direct -->
+			<post id="Start Sample service" uri="/executeApp" consumes="application/json"
+				produces="application/json">
+				<route>
+					<setProperty propertyName="appName">
+						<simple>${body[appName]}</simple>
+					</setProperty>
+					<to uri="seda:executeApp" />
+					<setBody>
+						<constant>{"status":"{{camel.completed}}"}</constant>
+					</setBody>
+				</route>
+			</post>
+			<get id="Test Start get Sample service" uri="/getTestExecuteApp/{appName}"
+				consumes="application/json" produces="application/json">
+				
+				<route>
+				<log message="Testing logs"/>
+				<setProperty propertyName="appName">
+					<simple>${header.appName}</simple>
+				</setProperty>
+				<to uri="seda:executeApp" />
+				<setBody>
+					<constant>{"status":"{{camel.completed}}"}</constant>
+				</setBody>
+				</route>
+			</get>
+			<get id="Start get Sample service" uri="/getExecuteApp/{appName}"
+				consumes="application/json" produces="application/json">
+				
+				<route>
+				<log message="Testing logs"/>
+				<to uri="file:///opt/logs/chef?fileExist=Append&amp;fileName=${property.appName}-chef.txt" />
+					<setProperty propertyName="appName">
+						<simple>${header.appName}</simple>
+					</setProperty>
+					<to uri="seda:executeApp" />
+					<setBody>
+						<constant>{"status":"{{camel.completed}}"}</constant>
+					</setBody>
+					<convertBodyTo type="java.lang.String" />
+					<to uri="file:///opt/logs/chef?fileExist=Append&amp;fileName=${property.appName}-chef.txt" />
+				</route>
+			</get>
+			<get id="Chef Status Logs" uri="/getChefLog/{queueName}"
+				consumes="application/json" produces="application/json">
+				<route>
+					<setProperty propertyName="queueName">
+						<simple>${header.queueName}</simple>
+					</setProperty>
+					<to uri="bean:messageConverter?method=getLogs(/opt/logs/chef/${property.queueName}-chef.txt)"/>
+				</route>
+			</get>
+			<post id="Start Bean Sample service" uri="/executeAppService"
+				consumes="application/json" produces="application/json">
+				<route>
+					<setProperty propertyName="appName">
+						<simple>${body[appName]}</simple>
+					</setProperty>
+					<to uri="seda:executeAppService" />
+					<setBody>
+						<constant>{"status":"{{camel.completed}}"}</constant>
+					</setBody>
+				</route>
+			</post>
+
+			<!--Using inOnly (instead of to) makes route calls asynchronsly, Restpi 
+				will send the response to requester and it will call the service -->
+			<post id="Start Sample Async Web service" uri="/startAsyncSampleService"
+				consumes="application/json" produces="application/json">
+				<route>
+					<inOnly uri="seda:startAsyncService" />
+					<setBody>
+						<constant>{"status":"{{camel.inprogressStatus}}"}</constant>
+					</setBody>
+				</route>
+			</post>
+			<post id="Deploy service" uri="/deploy" consumes="application/json"
+				produces="application/json">
+				<route>
+					<to uri="seda:deployService" />
+				</route>
+			</post>
+			<!-- <get id="SSH Service" uri="/ConnectSSH" consumes="application/json" 
+				produces="application/json"> <route> <setHeader headerName="Accept"> <constant>application/string</constant> 
+				</setHeader> <setHeader headerName="Content-Type"> <constant>application/string</constant> 
+				</setHeader> <setBody> <constant>ls&#10;</constant> </setBody> <log message="UpdateIHSConfig, 
+				Executing the following command ${body}" /> <to uri="ssh://yc05s3b@mdc2vr4079" 
+				/> </route> </get> <get id="List containers" uri="/listOfContainers" consumes="application/json" 
+				produces="application/json"> <route> <to uri="docker://image/list?host='192.168.99.100';port='2376';"/> 
+				</route> </get> -->
+		</rest>
+	</camelContext>
+	<bean id="dataSource"
+		class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+		<property name="driverClassName" value="com.mysql.jdbc.Driver" />
+		<property name="url" value="jdbc:mysql://localhost:3306/udeploy-integration?autoReconnect=true&amp;useSSL=false" />
+		<property name="username" value="root" />
+		<property name="password" value="" />
+	</bean>
+
+	<bean id="sampleService" class="com.macys.cd.camel.service.SampleService" />
+	<bean id="messageConverter" name="messageConverter" class="com.macys.cd.camel.service.MessageConverter"/>
+	
+</beans>
