@@ -1,4 +1,4 @@
 # CamelIntegration
 #
 ---
-Testin
+Testing
