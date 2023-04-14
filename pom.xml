@@ -17,7 +17,7 @@
 		<guava.version>19.0</guava.version>
 		<recurrent.version>0.4.0</recurrent.version>
 		<java.version>1.7</java.version>
-		<camel.version>2.24.0</camel.version>
+		<camel.version>3.2.0</camel.version>
 		<powermock.version>1.6.2</powermock.version>
 		<json.version>20140107</json.version>
 		<mysqljdbc.version>5.1.38</mysqljdbc.version>
